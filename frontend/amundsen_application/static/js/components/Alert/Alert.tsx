@@ -24,9 +24,10 @@ const SEVERITY_TO_SEVERITY_CLASS = {
   [NoticeSeverity.WARNING]: 'is-warning',
   [NoticeSeverity.ALERT]: 'is-alert',
 };
-const OPEN_PAYLOAD_CTA = 'See details';
-const PAYLOAD_MODAL_TITLE = 'Summary';
+export const OPEN_PAYLOAD_CTA = 'See details';
+export const PAYLOAD_MODAL_TITLE = 'Summary';
 const PAYLOAD_MODAL_CLOSE_BTN = 'Close';
+const PAYLOAD_DEFINITION_WIDTH = 180;
 
 export interface AlertProps {
   /** Message to show in the alert */
@@ -81,6 +82,9 @@ export const Alert: React.FC<AlertProps> = ({
         onClick={handleSeeDetails}
       >
         {OPEN_PAYLOAD_CTA}
+        {(payload?.descriptions || []).length > 1
+          ? ` (${(payload.descriptions || []).length})`
+          : ''}
       </button>
     );
   }
@@ -110,6 +114,7 @@ export const Alert: React.FC<AlertProps> = ({
   if (severity === NoticeSeverity.INFO) {
     iconComponent = (
       <InformationIcon
+        data-testid="info-icon"
         fill={SEVERITY_TO_COLOR_MAP[severity]}
         size={IconSizes.REGULAR}
       />
@@ -117,6 +122,9 @@ export const Alert: React.FC<AlertProps> = ({
   } else {
     iconComponent = (
       <AlertIcon
+        data-testid={
+          severity === NoticeSeverity.WARNING ? 'warning-icon' : 'alert-icon'
+        }
         stroke={SEVERITY_TO_COLOR_MAP[severity]}
         size={IconSizes.SMALL}
       />
@@ -149,7 +157,10 @@ export const Alert: React.FC<AlertProps> = ({
             <Modal.Title>{PAYLOAD_MODAL_TITLE}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <DefinitionList definitions={payloadDefinitions} termWidth={120} />
+            <DefinitionList
+              definitions={payloadDefinitions}
+              termWidth={PAYLOAD_DEFINITION_WIDTH}
+            />
           </Modal.Body>
           <Modal.Footer>
             <button

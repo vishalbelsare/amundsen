@@ -56,7 +56,7 @@ PUBLISHED_TAG_PROPERTY_NAME = 'published_tag'
 LOGGER = logging.getLogger(__name__)
 
 
-def execute_statement(tx: Transaction, stmt: str, params: dict = None) -> List[Record]:
+def execute_statement(tx: Transaction, stmt: str, params: Optional[dict] = None) -> List[Record]:
     """
     Executes statement against Neo4j. If execution fails, it rollsback and raises exception.
     """
@@ -159,8 +159,9 @@ class Neo4jProxy(BaseProxy):
         cols, last_neo4j_record = self._exec_col_query(table_uri)
 
         readers = self._exec_usage_query(table_uri)
+        owners = self._exec_owners_query(table_uri)
 
-        wmk_results, table_writer, table_apps, timestamp_value, owners, tags, source, \
+        wmk_results, table_writer, table_apps, timestamp_value, tags, source, \
             badges, prog_descs, resource_reports = self._exec_table_query(table_uri)
 
         joins, filters = self._exec_table_query_query(table_uri)
@@ -341,13 +342,33 @@ class Neo4jProxy(BaseProxy):
         return readers
 
     @timer_with_counter
+    def _exec_owners_query(self, table_uri: str) -> List[User]:
+        # Return Value: List[User]
+        owners_query = textwrap.dedent("""
+            MATCH (owner:User)<-[:OWNER]-(tbl:Table {key: $tbl_key})
+            RETURN collect(distinct owner) as owner_records
+        """)
+        owners_neo4j_records = self._execute_cypher_query(statement=owners_query,
+                                                          param_dict={'tbl_key': table_uri})
+
+        owners_neo4j_records = get_single_record(owners_neo4j_records)
+
+        owners = []  # type: List[User]
+        for owner_neo4j_record in owners_neo4j_records.get('owner_records', []):
+            owner_data = self._get_user_details(user_id=owner_neo4j_record['email'])
+            owner = self._build_user_from_record(record=owner_data)
+            owners.append(owner)
+
+        return owners
+
+    @timer_with_counter
     def _exec_table_query(self, table_uri: str) -> Tuple:
         """
         Queries one Cypher record with watermark list, Application,
-        ,timestamp, owner records and tag records.
+        ,timestamp, and tag records.
         """
 
-        # Return Value: (Watermark Results, Table Writer, Last Updated Timestamp, owner records, tag records)
+        # Return Value: (Watermark Results, Table Writer, Last Updated Timestamp, tag records)
 
         table_level_query = textwrap.dedent("""\
         MATCH (tbl:Table {key: $tbl_key})
@@ -355,7 +376,6 @@ class Neo4jProxy(BaseProxy):
         OPTIONAL MATCH (app_producer:Application)-[:GENERATES]->(tbl)
         OPTIONAL MATCH (app_consumer:Application)-[:CONSUMES]->(tbl)
         OPTIONAL MATCH (tbl)-[:LAST_UPDATED_AT]->(t:Timestamp)
-        OPTIONAL MATCH (owner:User)<-[:OWNER]-(tbl)
         OPTIONAL MATCH (tbl)-[:TAGGED_BY]->(tag:Tag{tag_type: $tag_normal_type})
         OPTIONAL MATCH (tbl)-[:HAS_BADGE]->(badge:Badge)
         OPTIONAL MATCH (tbl)-[:SOURCE]->(src:Source)
@@ -365,7 +385,6 @@ class Neo4jProxy(BaseProxy):
         collect(distinct app_producer) as producing_apps,
         collect(distinct app_consumer) as consuming_apps,
         t.last_updated_timestamp as last_updated_timestamp,
-        collect(distinct owner) as owner_records,
         collect(distinct tag) as tag_records,
         collect(distinct badge) as badge_records,
         src,
@@ -405,12 +424,6 @@ class Neo4jProxy(BaseProxy):
 
         timestamp_value = table_records['last_updated_timestamp']
 
-        owner_record = []
-
-        for owner in table_records.get('owner_records', []):
-            owner_data = self._get_user_details(user_id=owner['email'])
-            owner_record.append(self._build_user_from_record(record=owner_data))
-
         src = None
 
         if table_records['src']:
@@ -423,7 +436,7 @@ class Neo4jProxy(BaseProxy):
 
         resource_reports = self._extract_resource_reports_from_query(table_records.get('resource_reports', []))
 
-        return wmk_results, table_writer, table_apps, timestamp_value, owner_record,\
+        return wmk_results, table_writer, table_apps, timestamp_value, \
             tags, src, badges, prog_descriptions, resource_reports
 
     @timer_with_counter
@@ -434,7 +447,7 @@ class Neo4jProxy(BaseProxy):
         on the table.
         """
 
-        # Return Value: (Watermark Results, Table Writer, Last Updated Timestamp, owner records, tag records)
+        # Return Value: (Watermark Results, Table Writer, Last Updated Timestamp, tag records)
         table_query_level_query = textwrap.dedent("""
         MATCH (tbl:Table {key: $tbl_key})
         OPTIONAL MATCH (tbl)-[:COLUMN]->(col:Column)-[COLUMN_JOINS_WITH]->(j:Join)
@@ -522,7 +535,7 @@ class Neo4jProxy(BaseProxy):
 
         return parsed_reports
 
-    def _extract_joins_from_query(self, joins: List[Dict]) -> List[Dict]:
+    def _extract_joins_from_query(self, joins: List[Dict]) -> List[SqlJoin]:
         valid_joins = []
         for join in joins:
             join_data = join['join']
@@ -535,7 +548,7 @@ class Neo4jProxy(BaseProxy):
                 valid_joins.append(new_sql_join)
         return valid_joins
 
-    def _extract_filters_from_query(self, filters: List[Dict]) -> List[Dict]:
+    def _extract_filters_from_query(self, filters: List[Dict]) -> List[SqlWhere]:
         return_filters = []
         for filt in filters:
             filter_where = filt.get('where_clause')
@@ -611,7 +624,7 @@ class Neo4jProxy(BaseProxy):
                                             param_dict={'key': uri})
 
         result = get_single_record(result)
-        return Description(description=result['description'] if result else None)
+        return Description(description=result['description'] if result else None)  # type: ignore
 
     @timer_with_counter
     def get_table_description(self, *,
@@ -1513,8 +1526,8 @@ class Neo4jProxy(BaseProxy):
                           other_key_values=other_key_values)
 
     @staticmethod
-    def _get_user_resource_relationship_clause(relation_type: UserResourceRel, id: str = None,
-                                               user_key: str = None,
+    def _get_user_resource_relationship_clause(relation_type: UserResourceRel, id: Optional[str] = None,
+                                               user_key: Optional[str] = None,
                                                resource_type: ResourceType = ResourceType.Table) -> str:
         """
         Returns the relationship clause of a cypher query between users and tables
@@ -1581,6 +1594,10 @@ class Neo4jProxy(BaseProxy):
 
         results = []
         for record in records:
+            last_successful_run_timestamp = record['last_successful_run_timestamp']
+            if record['last_successful_run_timestamp'] == '':
+                last_successful_run_timestamp = None
+
             results.append(DashboardSummary(
                 uri=record['uri'],
                 cluster=record['cluster_name'],
@@ -1590,7 +1607,7 @@ class Neo4jProxy(BaseProxy):
                 name=record['name'],
                 url=record['url'],
                 description=record['description'],
-                last_successful_run_timestamp=record['last_successful_run_timestamp'],
+                last_successful_run_timestamp=last_successful_run_timestamp,
             ))
 
         return {ResourceType.Dashboard.name.lower(): results}
@@ -2028,10 +2045,8 @@ class Neo4jProxy(BaseProxy):
                                                   }))
 
         # ToDo: Add a root_entity as an item, which will make it easier for lineage graph
-        return Lineage(**{"key": id,
-                          "upstream_entities": upstream_tables,
-                          "downstream_entities": downstream_tables,
-                          "direction": direction, "depth": depth})
+        return Lineage(key=id, upstream_entities=upstream_tables, downstream_entities=downstream_tables,
+                       direction=direction, depth=depth)
 
     def _create_watermarks(self, wmk_records: List) -> List[Watermark]:
         watermarks = []
@@ -2044,7 +2059,7 @@ class Neo4jProxy(BaseProxy):
                                             create_time=record['create_time']))
         return watermarks
 
-    def _create_feature_watermarks(self, wmk_records: List) -> List[Watermark]:
+    def _create_feature_watermarks(self, wmk_records: List) -> List[FeatureWatermark]:
         watermarks = []
         for record in wmk_records:
             if record['key'] is not None:

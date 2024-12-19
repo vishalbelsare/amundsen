@@ -10,7 +10,8 @@ import * as ConfigUtils from 'config/config-utils';
 
 import { featureSummary } from 'fixtures/metadata/feature';
 
-import FeatureListItem, {
+import {
+  FeatureListItem,
   FeatureListItemProps,
 } from 'components/ResourceListItem/FeatureListItem';
 import { RightIcon } from 'components/SVGIcons';
@@ -21,6 +22,7 @@ const MOCK_ICON_CLASS = 'test-class';
 jest.mock('config/config-utils', () => ({
   getSourceDisplayName: jest.fn(() => MOCK_DISPLAY_NAME),
   getSourceIconClass: jest.fn(() => MOCK_ICON_CLASS),
+  getFilterConfigByResource: jest.fn(),
 }));
 
 describe('FeatureListItem', () => {
@@ -32,6 +34,7 @@ describe('FeatureListItem', () => {
         name: MOCK_DISPLAY_NAME,
         description: 'I am an ML <em>feature</em>',
       },
+      logSearchEvent: jest.fn(),
       ...propOverrides,
     };
     const wrapper = shallow<typeof FeatureListItem>(

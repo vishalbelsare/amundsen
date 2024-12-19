@@ -61,12 +61,8 @@ We want your input about what is important, for that, add your votes using the �
 * [Top Bugs](https://github.com/amundsen-io/amundsen/issues?q=is%3Aissue+is%3Aclosed+sort%3Areactions-%2B1-desc+label%3Atype%3Abug+label%3Astatus%3Aneeds_votes+)
 * [Top Questions](https://github.com/amundsen-io/amundsen/issues?q=is%3Aissue+is%3Aclosed+sort%3Areactions-%2B1-desc+label%3Atype%3Aquestion+label%3Astatus%3Aneeds_votes)
 
-## Roadmap
-
-Please visit [Roadmap](https://www.amundsen.io/amundsen/roadmap/) if you are interested in Amundsen upcoming roadmap items.
-
 ## Requirements
-- Python 3.7
+- Python >= 3.8
 - Node v12
 
 ## User Interface
@@ -206,7 +202,6 @@ Please visit [Architecture](https://www.amundsen.io/amundsen/architecture/) for 
 - [Linux Foundation AI Foundation Landscape](https://landscape.lfai.foundation/)
 - [Lyft’s Amundsen: Data-Discovery with Built-In Trust](https://thenewstack.io/lyfts-amundsen-data-discovery-with-built-in-trust/)
 - [How to find and organize your data from the command-line](https://towardsdatascience.com/how-to-find-and-organize-your-data-from-the-command-line-852a4042b2be)
-- [Data Discovery Platform at Bagelcode](https://medium.com/bagelcode/data-discovery-platform-at-bagelcode-b58a622d17fd)
 - [Cataloging Tools for Data Teams](https://towardsdatascience.com/cataloging-tools-for-data-teams-8d62d7a4cd95)
 - [An Overview of Data Discovery Platforms and Open Source Solutions](https://eugeneyan.com/writing/data-discovery-platforms/)
 - [Hacking Data Discovery in AWS with Amundsen at SEEK](https://medium.com/seek-blog/hacking-data-discovery-with-amundsen-c55d262014f4)
@@ -217,6 +212,7 @@ Please visit [Architecture](https://www.amundsen.io/amundsen/architecture/) for 
 - [Building a data discovery solution with Amundsen and Amazon Neptune](https://aws.amazon.com/blogs/database/building-a-data-discovery-solution-with-amundsen-and-amazon-neptune/)
 - [Amundsen — Installing in an Istio-enabled environment](https://medium.com/@owenleung_89035/amundsen-installing-in-an-istio-enabled-environment-d0b9bdaeac49)
 - [Amundsen — Integrate with Okta SingleSignOn](https://medium.com/@owenleung_89035/amundsen-integrate-with-okta-singlesignon-20ad0a22d3d9)
+- [Data Engineering Skills](https://www.scaler.com/blog/data-engineer-skills/)
 
 ### Community meetings
 
@@ -238,7 +234,6 @@ Here is the list of organizations that are **officially** using Amundsen today. 
       <td>
         <ul>
           <li><a href="https://asana.com/">Asana</a></li>
-          <li><a href="https://site.bagelcode.com/">Bagelcode</a></li>
           <li><a href="https://www.bang-olufsen.com/en">Bang & Olufsen</a></li>
           <li><a href="https://www.brex.com/">Brex</a></li>
           <li><a href="https://www.cameo.com">Cameo</a></li>

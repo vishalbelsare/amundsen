@@ -171,13 +171,6 @@ class TestNeo4jProxy(unittest.TestCase):
                 }
             ],
             'last_updated_timestamp': 1,
-            'owner_records': [
-                {
-                    'key': 'tester@example.com',
-                    'email': 'tester@example.com',
-                    'updated_at': 0,
-                }
-            ],
             'tag_records': [
                 {
                     'key': 'test',
@@ -236,6 +229,14 @@ class TestNeo4jProxy(unittest.TestCase):
             ]
         }]
 
+        owners_results = [{'owner_records': [
+            {
+                'key': 'tester@example.com',
+                'email': 'tester@example.com',
+                'updated_at': 0,
+            }
+        ], }]
+
         last_updated_timestamp = '01'
 
         self.col_usage_return_value = [
@@ -249,6 +250,8 @@ class TestNeo4jProxy(unittest.TestCase):
         self.last_updated_timestamp = last_updated_timestamp
 
         self.table_common_usage = table_common_usage
+
+        self.owners_return_value = owners_results
 
         self.col_bar_id_1_expected_type_metadata = self._get_col_bar_id_1_expected_type_metadata()
         self.col_bar_id_2_expected_type_metadata = self._get_col_bar_id_2_expected_type_metadata()
@@ -355,9 +358,11 @@ class TestNeo4jProxy(unittest.TestCase):
 
     def test_get_table(self) -> None:
         with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
+            # mock database return values such that we match ordering of queries executed in Neo4jProxy.get_table
             mock_execute.side_effect = [
                 self.col_usage_return_value,
                 [],
+                self.owners_return_value,
                 self.table_level_return_value,
                 self.table_common_usage,
                 []
@@ -445,6 +450,7 @@ class TestNeo4jProxy(unittest.TestCase):
             mock_execute.side_effect = [
                 col_usage_return_value,
                 [],
+                self.owners_return_value,
                 self.table_level_return_value,
                 self.table_common_usage,
                 []
@@ -1176,6 +1182,42 @@ class TestNeo4jProxy(unittest.TestCase):
             self.assertEqual(len(result['dashboard']), 1)
             self.assertEqual(expected, result['dashboard'][0])
 
+    def test_get_dashboard_by_user_relation_empty_string_last_successful_run_timestamp(self) -> None:
+        """
+        Expect last_successful_run_timestamp to be None if value in DB is empty string.
+        """
+        with patch.object(GraphDatabase, 'driver'), patch.object(Neo4jProxy, '_execute_cypher_query') as mock_execute:
+            mock_execute.return_value = [
+                {
+                    'uri': 'dashboard_uri',
+                    'cluster_name': 'cluster',
+                    'dg_name': 'dashboard_group',
+                    'dg_url': 'http://foo.bar/group',
+                    'product': 'foobar',
+                    'name': 'dashboard',
+                    'url': 'http://foo.bar/dashboard',
+                    'description': 'description',
+                    'last_successful_run_timestamp': ''
+                }
+            ]
+
+            neo4j_proxy = Neo4jProxy(host='neo4j://example.com', port=0000)
+            result = neo4j_proxy.get_dashboard_by_user_relation(user_email='test_user',
+                                                                relation_type=UserResourceRel.follow)
+
+            expected = DashboardSummary(uri='dashboard_uri',
+                                        cluster='cluster',
+                                        group_name='dashboard_group',
+                                        group_url='http://foo.bar/group',
+                                        product='foobar',
+                                        name='dashboard',
+                                        url='http://foo.bar/dashboard',
+                                        description='description',
+                                        last_successful_run_timestamp=None)
+
+            self.assertEqual(len(result['dashboard']), 1)
+            self.assertEqual(expected, result['dashboard'][0])
+
     def test_add_resource_relation_by_user(self) -> None:
         with patch.object(GraphDatabase, 'driver') as mock_driver:
             mock_session = MagicMock()
@@ -1518,7 +1560,7 @@ class TestNeo4jProxy(unittest.TestCase):
             key = "alpha"
             mock_execute.return_value = [{
                 "upstream_entities": [
-                    {"key": "beta", "source": "gold", "level": 1, "badges": [], "usage":100, "parent": None},
+                    {"key": "beta", "source": "gold", "level": 1, "badges": [], "usage": 100, "parent": None},
                     {"key": "gamma", "source": "dyno", "level": 1,
                      "badges":
                         [
@@ -1535,17 +1577,13 @@ class TestNeo4jProxy(unittest.TestCase):
             expected = Lineage(
                 key=key,
                 upstream_entities=[
-                    LineageItem(**{"key": "beta", "source": "gold", "level": 1, "badges": [], "usage":100}),
-                    LineageItem(**{"key": "gamma", "source": "dyno", "level": 1,
-                                   "badges":
-                                       [
-                                           Badge(**{"badge_name": "badge1", "category": "default"}),
-                                           Badge(**{"badge_name": "badge2", "category": "default"})
-                                       ],
-                                   "usage": 200}),
+                    LineageItem(key="beta", source="gold", level=1, badges=[], usage=100),
+                    LineageItem(key="gamma", source="dyno", level=1,
+                                badges=[Badge(**{"badge_name": "badge1", "category": "default"}),
+                                        Badge(**{"badge_name": "badge2", "category": "default"})], usage=200),
                 ],
                 downstream_entities=[
-                    LineageItem(**{"key": "delta", "source": "gold", "level": 1, "badges": [], "usage": 50})
+                    LineageItem(key="delta", source="gold", level=1, badges=[], usage=50)
                 ],
                 direction="both",
                 depth=1
